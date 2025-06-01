@@ -18,8 +18,12 @@
     "scanner",
     "vulnerability"
   ],
-  "author": "",
+  "author": "DhanushNehru",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DhanushNehru/pdf-xss-scanner"
+  },
   "dependencies": {
     "pdf-parse": "^1.1.1",
     "chalk": "^4.1.2",
