@@ -1,0 +1,37 @@
+{
+  "name": "pdf-xss-scanner",
+  "version": "1.0.0",
+  "description": "A tool to detect XSS vulnerabilities in PDF documents",
+  "main": "src/index.js",
+  "bin": {
+    "pdf-xss-scan": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "jest",
+    "start": "node bin/cli.js",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "pdf",
+    "security",
+    "xss",
+    "scanner",
+    "vulnerability"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pdf-parse": "^1.1.1",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "ora": "^5.4.1",
+    "node-html-parser": "^6.1.11"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.56.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
