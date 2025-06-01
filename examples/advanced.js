@@ -1,77 +1,86 @@
 /**
- * PDF XSS Scanner - Advanced Example
- * 
- * This example demonstrates advanced usage with custom options.
+ * Advanced example of using pdf-xss-checker
  */
-
-const pdfXssScanner = require('../src/index');
 const fs = require('fs');
-const path = require('path');
+const { scanPdf, scanBuffer, utils } = require('../src/index');
 
-async function advancedScan(pdfPath) {
+async function advancedCheck(filePath, options = {}) {
+  console.log(`Advanced scan of ${filePath} with options:`, options);
+  
   try {
-    if (!pdfPath) {
-      throw new Error('Please provide a path to a PDF file as an argument');
-    }
-
-    console.log('Starting advanced PDF XSS vulnerability scan...');
+    // Read the file as a buffer
+    const pdfBuffer = fs.readFileSync(filePath);
     
-    // Resolve the PDF path
-    const resolvedPath = path.resolve(pdfPath);
-    console.log(`Scanning PDF at: ${resolvedPath}`);
+    // Get the file size
+    const fileSize = utils.formatSize(pdfBuffer.length);
+    console.log(`File size: ${fileSize}`);
     
-    // Custom scanner options
-    const options = {
-      sensitivityLevel: 4, // Higher sensitivity (1-5)
-      scanObfuscated: true,
-      scanEmbeddedFiles: true,
-      scanTimeout: 120000, // 2 minutes
-      reporting: {
-        includeContentMatches: true,
-        maxMatchLength: 300,
-        sortBySeverity: true
-      }
+    // Custom scan options
+    const scanOptions = {
+      threshold: options.threshold || 'medium',
+      detectors: options.detectors || ['xss', 'js', 'form'],
+      includeRawContent: options.includeRawContent || false,
+      includeFullDetails: true,
+      includeGrouped: true
     };
     
-    // Scan the PDF with custom options
-    const results = await pdfXssScanner.scanPdf(resolvedPath, options);
+    // Scan the buffer directly
+    console.log('Scanning PDF buffer...');
+    const results = await scanBuffer(pdfBuffer, scanOptions);
     
-    // Print results summary
-    console.log('\nScan Results:');
-    console.log('--------------');
-    console.log(`PDF: ${resolvedPath}`);
-    console.log(`Vulnerabilities detected: ${results.summary.vulnerabilityCount}`);
-    console.log(`Risk level: ${results.summary.riskLevel}`);
-    console.log(`High severity: ${results.summary.highSeverityCount}`);
-    console.log(`Medium severity: ${results.summary.mediumSeverityCount}`);
-    console.log(`Low severity: ${results.summary.lowSeverityCount}`);
-    
-    // Save full results to a JSON file
-    const outputPath = path.join(__dirname, 'scan_results.json');
-    fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
-    console.log(`\nDetailed results saved to: ${outputPath}`);
-    
-    // Analyze results by type
-    if (results.summary.hasVulnerabilities) {
-      console.log('\nVulnerability Analysis by Type:');
+    if (results.success) {
+      console.log('\nScan Summary:');
+      console.log(`  Safe to use: ${results.safeToUse ? 'Yes' : 'No'}`);
+      console.log(`  Risk level: ${results.riskLevel}`);
+      console.log(`  Vulnerabilities: ${results.vulnerabilities.length}`);
       
-      const { byType } = results.groupedResults;
-      for (const type in byType) {
-        console.log(`\n${type}: ${byType[type].length} vulnerabilities`);
+      // Severity breakdown
+      if (results.vulnerabilities.length > 0) {
+        const severityCounts = results.vulnerabilities.reduce((counts, vuln) => {
+          counts[vuln.severity] = (counts[vuln.severity] || 0) + 1;
+          return counts;
+        }, {});
         
-        // Show a sample of each type
-        const sample = byType[type][0];
-        console.log(`  Sample: [${sample.severity.toUpperCase()}] ${sample.pattern}`);
-        console.log(`  Description: ${sample.description}`);
+        console.log('\nVulnerabilities by Severity:');
+        Object.keys(severityCounts).forEach(severity => {
+          console.log(`  ${severity}: ${severityCounts[severity]}`);
+        });
+        
+        // List top 5 vulnerabilities
+        console.log('\nTop Vulnerabilities:');
+        results.vulnerabilities
+          .sort((a, b) => utils.getSeverityLevel(b.severity) - utils.getSeverityLevel(a.severity))
+          .slice(0, 5)
+          .forEach((vuln, index) => {
+            console.log(`\n${index + 1}. ${vuln.name} (${vuln.severity})`);
+            console.log(`   ${vuln.description}`);
+            if (vuln.matchedText) {
+              console.log(`   Matched: ${utils.truncateText(vuln.matchedText, 50)}`);
+            }
+          });
       }
+      
+      // Save full results to file if requested
+      if (options.outputFile) {
+        fs.writeFileSync(
+          options.outputFile, 
+          JSON.stringify(results, null, 2)
+        );
+        console.log(`\nFull results saved to ${options.outputFile}`);
+      }
+    } else {
+      console.error(`Error scanning PDF: ${results.error}`);
     }
-    
-    console.log('\nAdvanced scan completed successfully.');
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    console.error('Error:', error.message);
   }
 }
 
-// Get PDF path from command line arguments
-const pdfPath = process.argv[2];
-advancedScan(pdfPath);
+// Usage example (uncomment to use)
+// advancedCheck('./sample.pdf', {
+//   threshold: 'low',
+//   detectors: ['xss', 'js'],
+//   outputFile: 'results.json'
+// });
+
+module.exports = { advancedCheck };

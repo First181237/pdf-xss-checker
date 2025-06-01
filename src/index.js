@@ -1,35 +1,68 @@
 /**
- * PDF XSS Scanner
- * Main library entry point
+ * PDF XSS Checker
+ * Main entry point for the package
  */
-
-const pdfScanner = require('./scanner/pdfScanner');
-const { defaultOptions } = require('./config/options');
+const fs = require('fs');
+const path = require('path');
+const { scanPdfBuffer } = require('./scanner');
+const { generateReport } = require('./reporter');
 
 /**
- * Scan a buffer containing PDF data for XSS vulnerabilities
- * @param {Buffer} buffer - Buffer containing PDF data
- * @param {Object} options - Scanner options
- * @returns {Promise<boolean>} True if XSS vulnerabilities found, false otherwise
+ * Scan a PDF file for XSS vulnerabilities
+ * @param {string} filePath - Path to the PDF file
+ * @param {Object} options - Scanning options
+ * @returns {Promise<Object>} Scan results
  */
-async function scanBuffer(buffer, options = {}) {
-  if (!Buffer.isBuffer(buffer)) {
-    throw new Error('Input must be a buffer');
-  }
-
-  const mergedOptions = { ...defaultOptions, ...options };
-  
+const scanPdf = async (filePath, options = {}) => {
   try {
-    // Analyze PDF content
-    const scanResults = await pdfScanner.scanPdfContent(buffer, mergedOptions);
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
     
-    // Return simple boolean indicating if XSS was found
-    return scanResults.hasVulnerabilities;
+    const fileExtension = path.extname(filePath).toLowerCase();
+    if (fileExtension !== '.pdf') {
+      throw new Error('File must be a PDF');
+    }
+    
+    const pdfBuffer = fs.readFileSync(filePath);
+    const scanResults = await scanPdfBuffer(pdfBuffer, options);
+    return generateReport(scanResults, { fileName: path.basename(filePath), ...options });
   } catch (error) {
-    throw new Error(`PDF XSS scanning failed: ${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+      vulnerabilities: [],
+      safeToUse: false
+    };
   }
-}
+};
 
+/**
+ * Scan a PDF buffer for XSS vulnerabilities
+ * @param {Buffer} buffer - PDF file buffer
+ * @param {Object} options - Scanning options
+ * @returns {Promise<Object>} Scan results
+ */
+const scanBuffer = async (buffer, options = {}) => {
+  try {
+    const scanResults = await scanPdfBuffer(buffer, options);
+    return generateReport(scanResults, { fileName: 'buffer', ...options });
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      vulnerabilities: [],
+      safeToUse: false
+    };
+  }
+};
+
+/**
+ * Main API for the package
+ */
 module.exports = {
-  scanBuffer
+  scanPdf,
+  scanBuffer,
+  // Re-export utility functions
+  utils: require('./utils')
 };

@@ -1,103 +1,165 @@
-# PDF XSS Scanner
+# PDF XSS Checker
 
-A powerful Node.js tool for detecting Cross-Site Scripting (XSS) vulnerabilities in PDF documents.
-
-## Features
-
-- Comprehensive XSS pattern detection in PDF content
-- Detailed vulnerability reporting with severity levels
-- Command-line interface for easy usage
-- Programmatic API for integration into security workflows
-- Configurable sensitivity levels for different security needs
-- Color-coded terminal output for easy interpretation
+A Node.js package to verify if PDFs contain XSS (Cross-Site Scripting) vulnerabilities.
 
 ## Installation
 
 ```bash
-npm install pdf-xss-scanner
+npm install pdf-xss-checker
 ```
 
-Or install globally:
+## Features
 
-```bash
-npm install -g pdf-xss-scanner
-```
+- **PDF Content Extraction**: Extracts and analyzes text content from PDF files
+- **XSS Detection**: Identifies potential XSS vulnerabilities using pattern matching
+- **JavaScript Injection Detection**: Detects JavaScript code that could lead to security issues
+- **Form Injection Detection**: Identifies form-based attack vectors
+- **Simple API**: Easy-to-use API for both file and buffer inputs
+- **Detailed Reporting**: Comprehensive vulnerability reports with location information
+- **Command-line Interface**: Scan PDFs directly from the terminal
+- **Configurable Security Rules**: Adjust detection thresholds based on your security needs
 
 ## Usage
 
-### Command Line
-
-```bash
-# Basic usage
-pdf-xss-scan example.pdf
-
-# Set sensitivity level (1-5)
-pdf-xss-scan --sensitivity 4 example.pdf
-
-# Output results to JSON file
-pdf-xss-scan --output results.json example.pdf
-
-# Quiet mode (only output if vulnerabilities found)
-pdf-xss-scan --quiet example.pdf
-```
-
-### Programmatic API
+### API Usage
 
 ```javascript
-const pdfXssScanner = require('pdf-xss-scanner');
+const pdfXssChecker = require('pdf-xss-checker');
 
-async function scanMyPdf() {
+// Scan a PDF file
+async function checkPdf() {
   try {
-    // Scan a PDF file
-    const results = await pdfXssScanner.scanPdf('path/to/file.pdf');
+    const results = await pdfXssChecker.scanPdf('./document.pdf');
     
-    if (results.summary.hasVulnerabilities) {
-      console.log(`Found ${results.summary.vulnerabilityCount} vulnerabilities!`);
-      console.log(`Risk level: ${results.summary.riskLevel}`);
+    if (results.success) {
+      console.log(`Safe to use: ${results.safeToUse ? 'Yes' : 'No'}`);
+      console.log(`Found ${results.vulnerabilities.length} potential vulnerabilities`);
       
-      // Access detailed vulnerabilities
+      // Print vulnerabilities
       results.vulnerabilities.forEach(vuln => {
-        console.log(`${vuln.severity}: ${vuln.description}`);
+        console.log(`- ${vuln.name}: ${vuln.description} (${vuln.severity})`);
       });
     } else {
-      console.log('No vulnerabilities detected');
+      console.error(`Error: ${results.error}`);
     }
   } catch (error) {
-    console.error('Scanning failed:', error.message);
+    console.error('Error scanning PDF:', error);
   }
 }
 
-scanMyPdf();
+// Scan a PDF buffer
+async function checkBuffer(buffer) {
+  try {
+    const results = await pdfXssChecker.scanBuffer(buffer);
+    console.log(`PDF is safe to use: ${results.safeToUse}`);
+    return results;
+  } catch (error) {
+    console.error('Error scanning buffer:', error);
+  }
+}
 ```
 
-## Configuration Options
-
-You can customize the scanner behavior by passing options:
+### Advanced Options
 
 ```javascript
 const options = {
-  sensitivityLevel: 3, // 1 (basic) to 5 (paranoid)
-  scanObfuscated: true, // Look for obfuscated patterns
-  scanEmbeddedFiles: true, // Scan embedded files in the PDF
-  reporting: {
-    includeContentMatches: true, // Include matched content in results
-    maxMatchLength: 200, // Maximum length of included content
-    sortBySeverity: true // Sort vulnerabilities by severity
-  }
+  threshold: 'medium', // Severity threshold: 'low', 'medium', 'high', 'critical'
+  detectors: ['xss', 'js', 'form'], // Which detectors to use
+  includeRawContent: false, // Include raw PDF content in results
+  maxContentLength: 10000000 // Maximum content length to analyze (10MB)
 };
 
-const results = await pdfXssScanner.scanPdf('example.pdf', options);
+const results = await pdfXssChecker.scanPdf('./document.pdf', options);
 ```
 
-## How It Works
+### Command-line Usage
 
-The scanner performs the following steps:
+```bash
+# Basic usage
+npx pdf-xss-check document.pdf
 
-1. Parses the PDF document to extract text content, links, and JavaScript
-2. Applies a comprehensive set of XSS detection patterns
-3. Analyzes different components for potential vulnerabilities
-4. Assigns severity levels based on the type and context of matches
-5. Generates a detailed report with findings
+# With options
+npx pdf-xss-check document.pdf --threshold low --verbose --output results.json
+
+# Help
+npx pdf-xss-check --help
+```
+
+## CLI Options
+
+```
+Usage: pdf-xss-check [options] <file>
+
+Check PDF files for XSS vulnerabilities
+
+Arguments:
+  file                     PDF file to scan
+
+Options:
+  -V, --version            output the version number
+  -t, --threshold <level>  Detection threshold (low, medium, high, critical) (default: "medium")
+  -v, --verbose           Show detailed output (default: false)
+  -j, --json              Output results as JSON (default: false)
+  -o, --output <file>     Write results to file
+  --include-content       Include raw content in the report (may be large) (default: false)
+  --include-grouped       Include grouped vulnerabilities in the report (default: false)
+  -h, --help             display help for command
+```
+
+## Detection Patterns
+
+The package checks for various XSS and injection patterns, including:
+
+- Script tags (`<script>`)
+- JavaScript protocol usage (`javascript:`)
+- Event handlers (`onclick`, etc.)
+- iFrame elements
+- Document manipulation functions
+- JavaScript execution functions (`eval`, etc.)
+- Form injection vectors
+- PDF-specific JavaScript API calls
+
+## Results Format
+
+The scan results include:
+
+```javascript
+{
+  success: true,
+  summary: {
+    fileName: 'document.pdf',
+    timestamp: '2025-01-01T12:00:00.000Z',
+    pageCount: 5,
+    vulnerabilityCount: 3,
+    riskLevel: 'medium',
+    safeToUse: false,
+    severityCounts: { medium: 2, high: 1 },
+    typeCounts: { xss: 2, 'js-injection': 1 }
+  },
+  metadata: {
+    info: { /* PDF metadata */ },
+    pageCount: 5,
+    contentLength: 12345
+  },
+  vulnerabilities: [
+    {
+      type: 'xss',
+      name: 'Script Tag',
+      description: 'Found <script> tags that may execute JavaScript',
+      severity: 'high',
+      matchedText: '<script>alert("XSS")</script>',
+      location: {
+        startIndex: 1234,
+        endIndex: 1260,
+        line: 42,
+        column: 10
+      },
+      context: '...text before <script>alert("XSS")</script> text after...'
+    },
+    // More vulnerabilities...
+  ]
+}
+```
 
 ## License
 
